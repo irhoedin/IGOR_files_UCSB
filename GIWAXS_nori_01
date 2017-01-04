@@ -1,0 +1,1058 @@
+#pragma rtGlobals=3		// Use modern global access method and strict wave access.
+#include "NI1_Loader"
+#include "SO_WAXS_geometry"
+#include "SO_WAXS_panel"
+
+Proc linecut() : GraphStyle
+	PauseUpdate; Silent 1		// modifying window...
+	ModifyGraph/Z gFont="Helvetica",gfSize=20
+	ModifyGraph/Z lSize=2
+	ModifyGraph/Z rgb[0]=(1,16019,65535),rgb[2]=(3,52428,1)
+	Label/Z bottom "q (A\\S-1\\M)"
+	SetAxis/Z left 8982.22997416021,109691.997416021
+	SetAxis/Z bottom 0.326233766233766,0.602077922077922
+EndMacro
+
+Proc Graph8Style() : GraphStyle
+	PauseUpdate; Silent 1		// modifying window...
+	ModifyGraph/Z gFont="Helvetica",gfSize=20,width=283.465,height={Aspect,1}
+	ModifyGraph/Z lSize=2
+	ModifyGraph/Z rgb[0]=(1,16019,65535),rgb[2]=(3,52428,1)
+	Label/Z bottom "q (A\\S-1\\M)"
+EndMacro
+
+Menu "GIWAXS"
+	"Open Nori's panel", launch_nori_panel()
+	
+end
+
+
+Macro launch_nori_panel()
+
+	nori_GIWAXS_panel()
+	create_noriG_folders()
+
+end
+	
+
+
+Window nori_GIWAXS_panel() : Panel // obsolete, old version
+	PauseUpdate; Silent 1		// building window...
+	NewPanel /W=(0,0,800,820) as "nori GIWAXS tools"
+	ModifyPanel frameStyle=2, cbRGB=(48896, 52992, 65280)
+	
+	ListBox raw_list,pos={10,50},size={200,100}
+	ListBox raw_list,listWave=root:nori:raw_wl
+	ListBox raw_list,selWave=root:nori:raw_wl_n,row= 69
+	ListBox raw_list,mode= 8
+	
+	ListBox qzqxy_list,pos={220,50},size={200,100}
+	ListBox qzqxy_list,listWave=root:nori:qzqxy_wl
+	ListBox qzqxy_list,selWave=root:nori:qzqxy_wl_n,row= 69
+	ListBox qzqxy_list,mode= 8
+	
+	ListBox qzqxys_list,pos={430,50},size={200,100}
+	ListBox qzqxys_list,listWave=root:nori:qzqxys_wl
+	ListBox qzqxys_list,selWave=root:nori:qzqxys_wl_n,row= 69
+	ListBox qzqxys_list,mode= 8
+
+	ListBox chiqs_list,pos={10,160},size={200,100}
+	ListBox chiqs_list,listWave=root:nori:chiqs_wl
+	ListBox chiqs_list,selWave=root:nori:chiqs_wl_n,row= 69
+	ListBox chiqs_list,mode= 8
+	
+	ListBox ivsq_list,pos={220,160},size={200,100}
+	ListBox ivsq_list,listWave=root:nori:ivsq_wl
+	ListBox ivsq_list,selWave=root:nori:ivsq_wl_n,row= 69
+	ListBox ivsq_list,mode= 8
+	
+	ListBox ivschi_list,pos={430,160},size={200,100}
+	ListBox ivschi_list,listWave=root:nori:ivschi_wl
+	ListBox ivschi_list,selWave=root:nori:ivschi_wl_n,row= 69
+	ListBox ivschi_list,mode= 8
+	
+	//Buttons at right
+	Button plot_raw,pos={650,50},size={100,40},proc=plot_raw,title="Plot raw image", disable=2 //now disabled
+	Button loadtif,pos={650,100},size={100,40},proc=imageloadbutton_nori,title="load tif"
+	
+	SetVariable Dezingertimes,pos={650,160},size={130,16},title="Dezinger N times:"
+	SetVariable Dezingertimes,value= root:Packages:GIWAXS:g_dezingertimes
+	SetVariable Dezingerratio,pos={650,180},size={130,16},title="Dezinger ratio:"
+	SetVariable Dezingerratio,limits={-inf,inf,0.1},value= root:Packages:GIWAXS:g_dezingerratio
+	Button SO_dezinger,pos={650,200},size={130,20},proc=SO_dezingerit,title="Dezinger"
+
+	
+	//Buttons at top
+	Button getwavelist,pos={41,19},size={200,20},proc=getwavelist,title="Read data folder"
+	
+	//Elements at "raw to qz(qxy)" tab
+	GroupBox raw_to, pos={10, 270}, size={300, 260}, title="raw to qz(qxy)", fsize=15, appearance={native, Mac},frame=0
+	
+	Button readfromNika,pos={90,300},size={100,20},proc=readfromNika,title="Read from Nika"
+	Button mar2300,pos={50,450},size={50,20},proc=mar2300size,title="mar2300"
+	Button mar3450,pos={110,450},size={50,20},proc=setmar3450,title="mar3450"
+	Button marCCD,pos={170,450},size={50,20},proc=setmarCCD,title="marCCD"
+	Button qzqxy_convert,pos={50,480},size={200,20},proc=qzqxy_convert_nori,title="Convert raw to qz qxy"
+
+		
+	SetVariable setBCX,pos={20,330},size={120,10},title="BCX"
+	SetVariable setBCX,value= root:Packages:GIWAXS:g_BCX
+	SetVariable setBCY,pos={140,330},size={120,10},title="BCY"
+	SetVariable setBCY,value= root:Packages:GIWAXS:g_BCY
+	SetVariable setdetdist,pos={20,350},size={200,16},title="Detector distance (mm)"
+	SetVariable setdetdist,value= root:Packages:GIWAXS:g_R
+	SetVariable incidence_angle,pos={20,370},size={200,16},title="Incidence angle (deg)"
+	SetVariable incidence_angle,limits={-inf,inf,0.01},value= root:Packages:GIWAXS:g_incidence
+	SetVariable qrange,pos={20,390},size={100,16},title="q range"
+	SetVariable qrange,limits={-inf,inf,0.1},value= root:Packages:GIWAXS:g_q_range
+	SetVariable q_res,pos={20,410},size={150,16},title="q resolution"
+	SetVariable q_res,value= root:Packages:GIWAXS:g_q_res
+	SetVariable pxsize,pos={20,430},size={100,16},title="Pixel size"
+	SetVariable pxsize,value= root:Packages:GIWAXS:g_pxsize
+	SetVariable Npixels,pos={130,430},size={150,16},title="N pixels on detector"
+	SetVariable Npixels,value= root:Packages:GIWAXS:g_N_pixels
+	
+	CheckBox rem_hor,pos={200,410},size={101,14},title="Remove horizon?"
+	CheckBox rem_hor,variable= root:Packages:GIWAXS:g_remhor
+	
+	//Elements at "qz(qxy) to chi(q)" tab
+	GroupBox qztochi, pos={340, 270}, size={300, 260}, title="qz(qxy) to chi(q)", fsize=15, appearance={native, Mac},frame=0
+
+	Button showchiq,pos={370,360},size={200,20},proc=showcake_nori,title="Show cakeslice"
+	Button chiq_convert,pos={370,380},size={200,20},proc=qzqxy_to_chiq_nori,title="Convert qz qxy to chiq"
+	
+	Button sincorr,pos={370,460},size={200,20},proc=sincorr,title="Apply sin correction to image", disable=2 //now disabled
+	Button integimage,pos={370,480},size={200,20},proc=Integimage_nori,title="Integrate chiq to IvsQ"
+	Button ivschicalc,pos={370,500},size={200,20},proc=ivschicalc_nori,title="Integrate chiq to IvsChi"
+	
+	SetVariable chi_start,pos={370,310},size={100,16},title="Start chi"
+	SetVariable chi_start,value= root:Packages:GIWAXS:g_chi_start
+	SetVariable end_chi,pos={370,330},size={100,16},title="End chi"
+	SetVariable end_chi,value= root:Packages:GIWAXS:g_chi_end
+	SetVariable start_q,pos={480,310},size={100,16},title="start q"
+	SetVariable start_q,limits={-inf,inf,0.1},value= root:Packages:GIWAXS:g_q_start
+	SetVariable end_q,pos={480,330},size={100,16},title="end q"
+	SetVariable end_q,limits={-inf,inf,0.1},value= root:Packages:GIWAXS:g_q_end
+	SetVariable remhorqz,pos={360,420},size={150,16},title="Remove qz < "
+	SetVariable remhorqz,limits={-inf,inf,0.01},value= root:Packages:GIWAXS:g_remhorqz
+	SetVariable memo,pos={370,440},size={150,16},title="chiq memo "
+	SetVariable memo, value= root:nori:chiq_memo
+	
+
+
+	//Elements at"Background" tab 
+	GroupBox bkg, pos={10, 540}, size={300, 260}, title="Background", fsize=15, appearance={native, Mac},frame=0	
+	
+	Button setbkgnd,pos={30,570},size={200,20},proc=setbkgnd_nori,title="Set background wave"
+	Button subtrbkgnd,pos={30,630},size={200,20},proc=subtrbkgnd_nori,title="Subtract selected background"
+	Button subtr_det_noise,pos={30,660},size={200,20},proc=subtr_det_noise,title="Subtract detector noise", disable=2 //now disabled
+	
+	SetVariable sqsize,pos={30,690},size={230,16},title="Det noise square size (px):"
+	SetVariable sqsize,value= root:Packages:GIWAXS:g_sqsize
+
+	SetVariable currbkgnddisplay,pos={30,600},size={272,16},title="Current background selected:"
+	SetVariable currbkgnddisplay,value= root:Packages:GIWAXS:g_bkgndname
+
+	//Elements at "Plot" tab
+	GroupBox plt, pos={340, 540}, size={300, 260}, title="Plot", fsize=15, appearance={native, Mac},frame=0		
+	
+	Button plotq,pos={370,570},size={200,20},proc=Button_plotq_nori,title="Plot qzqxy"
+	Button setonequadrant,pos={370,600},size={200,20},proc=axes_set_one_quadrant,title="Graph: 1 quadrant"
+	Button twoquadrants,pos={370,630},size={200,20},proc=set_two_quadrant,title="Graph: 2 quadrants"
+	Button setZscale,pos={500,660},size={49,41},proc=setZscale,title="Set"
+	Button logmaker,pos={370,720},size={200,20},proc=logbutton_nori,title="Make log image"
+	Button plot_chiq,pos={370,750},size={200,20},proc=plot_chiq_nori,title="Plot chiq image"
+
+
+	SetVariable graph_lowlimit,pos={370,660},size={73,16},proc=setliveZscale,title="Z low"
+	SetVariable graph_lowlimit,limits={-inf,inf,0.1},value= root:Packages:GIWAXS:g_Z_low
+	SetVariable Z_high,pos={370,690},size={75,16},proc=setliveZscale,title="Z high"
+	SetVariable Z_high,limits={-inf,inf,0.1},value= root:Packages:GIWAXS:g_Z_high
+
+	Slider Z_slider_high,pos={650,280},size={65,400},proc=giwaxs_slider1
+	Slider Z_slider_high,limits={0,6000,50},variable= root:Packages:GIWAXS:g_Z_high
+	Slider Z_slider_low,pos={710,280},size={65,400},proc=giwaxs_slider1
+	Slider Z_slider_low,limits={-1000,1000,50},variable= root:Packages:GIWAXS:g_Z_low
+
+
+EndMacro
+
+Function imageloadbutton_nori(ba) : ButtonControl
+	STRUCT WMButtonAction &ba
+
+	switch( ba.eventCode )
+		case 2: // mouse up
+			// click code here
+			imageloader_nori()
+			create_noriG_folders()
+			break
+		case -1: // control being killed
+			break
+	endswitch
+
+	return 0
+End
+
+function/S imageloader_nori()
+	Variable refNum
+	String message = "Select one or more files"
+	String outputPaths
+	String fileFilters = "All Files:.*;"
+ 
+	Open /D /R /MULT=1 /F=fileFilters /M=message refNum
+	outputPaths = S_fileName
+ 
+	if (strlen(outputPaths) == 0)
+		Print "Cancelled"
+	else
+		Variable numFilesSelected = ItemsInList(outputPaths, "\r")
+		Variable i
+		for(i=0; i<numFilesSelected; i+=1)
+			String path = StringFromList(i, outputPaths, "\r")
+					// Load general text file, 1st block (matrix only)
+			
+			ImageLoad/T=tiff path
+			string image_wn = Stringfromlist(0, S_Wavenames)
+			variable wn_len = strlen(image_wn)
+			string new_name= image_wn[0, wn_len - 15] + "_r" //remove timestamp
+			string timestamp = "timestamp: " + image_wn[wn_len - 13, wn_len]
+			duplicate/O $image_wn, $new_name
+			Killwaves $image_wn
+			Note $new_name, timestamp	
+		endfor
+	endif
+			
+
+ 	variable raw = update_raw_wavelist()
+	return outputPaths		// Will be empty if user canceled
+End
+
+
+
+Function create_noriG_folders()
+
+	NewDataFolder/O/S root:nori
+	variable raw = update_raw_wavelist()
+	variable qzqxy = update_qzqxy_wavelist()
+	variable qzqxys = update_qzqxys_wavelist()
+	variable chiq = update_chiqs_wavelist()
+	variable IvsQ = update_IvsQ_wavelist()
+	variable Ivschi = update_Ivschi_wavelist()
+	
+	String/G  root:nori:chiq_memo
+	
+End
+
+
+Function update_raw_wavelist()
+	
+	SetDataFolder root:
+	string raw_wl = Wavelist("*_r",";","")
+	make/T/O/N=(ItemsInList(raw_wl,";")) root:nori:raw_wl = stringfromlist(p, raw_wl,";")
+	sort/A root:nori:raw_wl, root:nori:raw_wl
+	make/O/N=(ItemsInList(raw_wl,";")) root:nori:raw_wl_n
+	return 0
+	
+End
+
+
+Function update_qzqxy_wavelist()
+
+	SetDataFolder root:
+	string qzqxy_wl = Wavelist("*_qzqxy",";","")
+	make/T/O/N=(ItemsInList(qzqxy_wl,";")) root:nori:qzqxy_wl = stringfromlist(p, qzqxy_wl,";")
+	sort/A root:nori:qzqxy_wl, root:nori:qzqxy_wl
+	make/O/N=(ItemsInList(qzqxy_wl,";")) root:nori:qzqxy_wl_n
+	return 0
+	
+End
+
+
+Function update_qzqxys_wavelist()
+
+	SetDataFolder root:
+	string qzqxys_wl = Wavelist("*_qzqxy_s",";","")
+	make/T/O/N=(ItemsInList(qzqxys_wl,";")) root:nori:qzqxys_wl = stringfromlist(p, qzqxys_wl,";")
+	sort/A root:nori:qzqxys_wl, root:nori:qzqxys_wl
+	make/O/N=(ItemsInList(qzqxys_wl,";")) root:nori:qzqxys_wl_n
+	return 0
+	
+End
+
+
+Function update_chiqs_wavelist()
+
+	SetDataFolder root:
+	string chiqs_wl = Wavelist("*_chiq_s",";","") + Wavelist("*_chiq",";","")
+	make/T/O/N=(ItemsInList(chiqs_wl,";")) root:nori:chiqs_wl = stringfromlist(p, chiqs_wl,";")
+	sort/A root:nori:chiqs_wl, root:nori:chiqs_wl
+	make/O/N=(ItemsInList(chiqs_wl,";")) root:nori:chiqs_wl_n
+	return 0
+	
+End
+
+
+Function update_IvsQ_wavelist()
+
+	SetDataFolder root:
+	string ivsq_wl = Wavelist("*_IvsQ",";","")
+	make/T/O/N=(ItemsInList(ivsq_wl,";")) root:nori:ivsq_wl = stringfromlist(p, ivsq_wl,";")
+	sort/A root:nori:ivsq_wl, root:nori:ivsq_wl
+	make/O/N=(ItemsInList(ivsq_wl,";")) root:nori:ivsq_wl_n
+	return 0
+	
+End
+
+
+Function update_Ivschi_wavelist()
+
+	SetDataFolder root:
+	string ivschi_wl = Wavelist("*_Ivschi",";","")
+	make/T/O/N=(ItemsInList(ivschi_wl,";")) root:nori:ivschi_wl = stringfromlist(p, ivschi_wl,";")
+	sort/A root:nori:ivschi_wl, root:nori:ivschi_wl
+	make/O/N=(ItemsInList(ivschi_wl,";")) root:nori:ivschi_wl_n
+	return 0
+	
+End
+
+
+Function qzqxy_convert_nori(ba) : ButtonControl
+	STRUCT WMButtonAction &ba
+
+	switch( ba.eventCode )
+		case 2: // mouse up
+			// click code here
+
+			wave/T img_list = root:nori:raw_wl
+			//string wavenamelist=wavelist("*",";","")
+			//print wavenamelist
+			variable i
+			wave thewavelist_number = root:nori:raw_wl_n
+			NVAR g_BCX = root:Packages:GIWAXS:g_BCX
+			NVAR g_BCY = root:Packages:GIWAXS:g_BCY
+			NVAR g_R = root:Packages:GIWAXS:g_R
+			NVAR g_incidence = root:Packages:GIWAXS:g_incidence
+			NVAR g_pxsize = root:Packages:GIWAXS:g_pxsize
+			NVAR g_q_range = root:Packages:GIWAXS:g_q_range
+			NVAR g_q_res = root:Packages:GIWAXS:g_q_res
+			NVAR g_N_pixels = root:Packages:GIWAXS:g_N_pixels
+			
+			string thiswavename			
+			for(i=0;i<numpnts(thewavelist_number);i+=1)
+				if(thewavelist_number[i]==1)
+				thiswavename = img_list[i]
+				distcorr2_nori($thiswavename,g_BCX,g_BCY,g_R,g_incidence,g_pxsize,g_q_range,g_q_res,g_N_pixels)
+				print thiswavename
+				endif
+			endfor
+			update_wavelist()
+			update_qzqxy_wavelist()
+			//print i
+			//distcorrprompt($thiswavename,)
+			//print "clicked qzqxy"
+			break
+		case -1: // control being killed
+			break
+	endswitch
+
+	return 0
+End
+
+
+function distcorr2_nori(det_image,BCX,BCY,R,incidence,pxsize,qrange,qres,Npixels) // take incidence angle into account!
+	wave det_image // raw detector input, assumed new CCD detector
+	variable BCX // beam center of detector image, X direction
+	variable BCY
+	variable R //0.07//e7 // sample-detector distance in pixels (0.1mm)
+	variable incidence // incidence angle in rad
+	variable pxsize // size of pixel in one dimension, square pixels assumed
+	variable qrange // range of q that will be converted
+	variable qres // resolution of the result image
+	variable Npixels
+	variable lambda=0.973571 // wavelength of the beam in angstrom
+	variable qx
+	variable qy
+	variable qxy
+	variable qz
+	variable q
+	variable chi
+	variable px // for reference to detector image, p as in pixel
+	variable py
+	variable theta2
+	variable k=2*Pi/lambda
+//	variable incidence = 1.2 * Pi/180 // incidence angle in rad
+	
+	
+	BCX=BCX*pxsize // beam center of detector image, X direction, convert to mm
+	BCY=BCY*pxsize
+	incidence = incidence * Pi/180 // incidence angle in rad
+	
+	duplicate/O det_image rawimage // easier to work with, I can set an x and y scaling for easier math
+	
+	setscale/P x, -BCX, pxsize, rawimage // pxsize pixel size, in mm
+	setscale/P y, BCY, -pxsize, rawimage
+
+	
+	// here you need to find the maximum and minimum qz and qxy. Anything above those values needs to be zero
+	// umm, just figure out if the pixel is outside of the image when filling the q space; this is easier probably.
+	// assign variable to x min x max etc.
+	// CCD detector size: 3072x3072 pixels
+	make/O/N=(Npixels) xwave // amazing that I didn't see anything odd when using this with mar2300 images!
+	make/O/N=(Npixels) ywave
+	setscale/P x, -BCX, pxsize, xwave
+	setscale/P x, BCY, -pxsize, ywave
+	xwave=x
+	ywave=x
+	variable nmax = 3071
+	variable xmin=xwave[0]
+	print "xmin=", xmin
+	variable xmax=xwave[nmax]
+	print "xmax=", xmax
+	variable ymin=ywave[nmax]
+	print "ymin=", ymin
+	variable ymax=ywave[0]
+//	print "BCX=", BCX
+//	print "BCY=", BCY
+//	print "xmin=", xmin
+//	print "xmax=", xmax
+//	print "ymin=", ymin
+//	print "ymax=", ymax
+	
+	
+
+	// this is the result image (reciprocal space)
+	// qres, qrange: e.g. range=2, res=0.0015 => 1333.33 pixels. Damn. number of pixels in result: round(range/res)
+	
+	variable qzpoints = round(qrange/qres)
+	variable qxypoints = 2*round(qrange/qres)
+	
+	make/O /N=(qxypoints,qzpoints) corr_image
+	corr_image=0
+	setscale/P x, -1*abs(qrange), qres, corr_image
+	setscale/P y, abs(qrange), (-1*qres), corr_image
+	
+	//make x and y waves for looking up the qxy and qz values
+	make/O /N=(qzpoints) qzwave
+	make/O /N=(qxypoints) qxywave
+	setscale/P x, qrange, (-1*qres), qzwave
+	setscale/P x, (-1*qrange), qres, qxywave
+	qxywave = x
+	qzwave = x
+	
+	// loop for filling the reciprocal image
+	variable i=1962
+	variable ii=298
+	variable term
+	variable costerm
+	variable s // use same terms as in the Stribeck paper
+	duplicate/O qzwave szwave
+	szwave=qzwave/(2*Pi) // maybe faster than calculating this in the loop? not sure...
+	
+	for(i=0;i<qxypoints;i+=1) // qxy range
+		for(ii=0;ii<qzpoints;ii+=1) // qz range
+			s=(sqrt((qxywave[i])^2+(qzwave[ii])^2))/(2*Pi)
+			//sz=qzwave[ii]/(2*Pi)
+			term=2*lambda*R*s / (2-((lambda)^2) * s^2)
+			costerm= ( (szwave[ii]/s) - ( (lambda*s/2)*sin(incidence) ) ) / cos(incidence) 
+			// determine the pixels on the detector image:
+			px=term * sqrt(1- (((lambda)^2) * (s^2)/4) - ((costerm)^2) )
+			py=term * costerm
+			// make px negative if qxy is negative (sign gets lost in taking the square):
+			if(qxywave[i]<0)
+				px=-px
+			endif
+			
+//			print "qxy=",qxywave[i]
+//			print "qz=", qz
+//			print "px=",px
+//			print "py=",py
+//			print rawimage(px)(py)
+				
+				// insert values into corrected image
+				// if pixel I'm trying to find is not on the detector, it's value will be zero
+				if(px < xmin)
+					corr_image[i][ii]=0
+				elseif (px > xmax)
+					corr_image[i][ii]=0
+				elseif(py < ymin)
+					corr_image[i][ii]=0
+				elseif(py > ymax)
+					corr_image[i][ii]=0
+				elseif(numtype(px)==2) // means if px == NaN
+					corr_image[i][ii]=0
+				elseif(numtype(py)==2)
+					corr_image[i][ii]=0
+				else
+					corr_image[i][ii]=rawimage(px)(py)
+				endif
+//			print corr_image[i][ii]
+
+		endfor
+	endfor
+	
+	// clean up folder
+	killwaves xwave, ywave, qzwave, qxywave, szwave
+	
+	string det_image_name = NameofWave(det_image)
+	string det_image_core = RemoveEnding(det_image_name, "_r")
+	string newname = det_image_core + "_qzqxy"
+	duplicate/O corr_image $newname
+	killwaves rawimage, corr_image
+end
+
+
+Function showcake_nori(ba) : ButtonControl //no modification by Nori
+	STRUCT WMButtonAction &ba
+
+	switch( ba.eventCode )
+		case 2: // mouse up
+			// click code here
+			visiblechiq()
+			break
+		case -1: // control being killed
+			break
+	endswitch
+
+	return 0
+End
+
+
+Function qzqxy_to_chiq_nori(ba) : ButtonControl
+	STRUCT WMButtonAction &ba
+
+
+	switch( ba.eventCode )
+		case 2: // mouse up
+			// click code here
+			string thiswavename
+			Wave/T original_img_list = root:nori:qzqxy_wl
+			Wave/T subtracted_img_list = root:nori:qzqxys_wl
+			
+			Wave org_n = root:nori:qzqxy_wl_n
+			Wave sub_n = root:nori:qzqxys_wl_n
+			
+			//print wavenamelist
+			variable i
+			
+			NVAR g_chi_start = root:Packages:GIWAXS:g_chi_start
+			NVAR g_chi_end = root:Packages:GIWAXS:g_chi_end
+			NVAR g_q_start = root:Packages:GIWAXS:g_q_start
+			NVAR g_q_end = root:Packages:GIWAXS:g_q_end
+			NVAR g_remhor = root:Packages:GIWAXS:g_remhor
+			NVAR g_remhorqz = root:Packages:GIWAXS:g_remhorqz
+			
+			for(i=0;i<numpnts(org_n);i+=1)
+				if(org_n[i]==1)
+				thiswavename = original_img_list[i]
+				qchiconvert_nori($thiswavename,(g_chi_start*Pi/180),(g_chi_end*Pi/180),g_q_start,g_q_end,g_remhor,g_remhorqz)
+				//print thiswavename
+				endif
+			endfor
+			
+			for(i=0;i<numpnts(sub_n);i+=1)
+				if(sub_n[i]==1)
+				thiswavename = subtracted_img_list[i]
+				qchiconvert_nori($thiswavename,(g_chi_start*Pi/180),(g_chi_end*Pi/180),g_q_start,g_q_end,g_remhor,g_remhorqz)
+				//print thiswavename
+				endif
+			endfor
+			
+			
+			update_chiqs_wavelist()
+			update_wavelist()
+			break
+		case -1: // control being killed
+			break
+	endswitch
+
+	return 0
+End
+
+
+function qchiconvert_nori(thisimage,chibegin,chiend,qbegin,qend,remhor,remhorqz) // take a cakeslice and convert to chi vs q; chi in radians
+	wave thisimage
+	variable chibegin,chiend,qbegin,qend,remhor,remhorqz
+	print "QCHI CONVERT"
+//	print chibegin
+//	print chiend
+//	print qbegin
+//	print qend
+	
+	
+	// define area to convert
+//	variable qbegin=0.3
+//	variable qend=2.5
+//	variable chibegin=0 // *2*Pi/360 // convert to radians
+//	variable chiend=0.385// *2*Pi/360
+	variable qxy
+	variable qz
+	variable q // = 1
+	variable chi // = -30 *2*Pi/360 // convert to radians
+	variable i=0
+	variable ii=0
+	
+	//if chiend is negative, the lookup table needs to be changed. The setscale commands don't account
+	// for this being negative (the delta needs to be negative). So use an if statement, and put delta in a variable
+	if(chiend<chibegin)
+		variable delta = -0.0005
+		else
+		delta = 0.0005
+	endif
+//	print "delta=",delta
+	
+	// make resultant image
+	make/O /N=((qend-qbegin)/0.001+1,(abs(chiend)-chibegin)/(0.0005)+1) chiq_image // 30 pixels per degree, q spacing 0.0015
+	chiq_image=0
+	setscale/P x, qbegin, 0.001, chiq_image // use kind of the spacing you get in 3450 images
+	setscale/P y, chibegin, delta, chiq_image // ~2416 for 87 degrees
+	
+	// make lookup waves
+	make/O /N=((qend-qbegin)/0.001+1), qwave
+	setscale/P x, qbegin, 0.001, qwave
+	qwave=x
+	make/O /N=((abs(chiend)-chibegin)/(0.0005)+1), chiwave
+	setscale/P x, chibegin, delta, chiwave
+	chiwave=x
+	
+	// make a loop that calculates chi and q for each pixel in the result image
+	for(i=0;i<(abs(chiend)-chibegin)/(0.0005);i+=1)
+		chi=chiwave[i]
+		for(ii=8;ii<(qend-qbegin)/0.001;ii+=1)
+		q=qwave[ii]
+			// for each point (chi, q) calculate qxy and qz
+				qz= sqrt( (q^2)/(1+(tan(chi))^2) )
+				qxy= qz*tan(chi)
+			//		print "qxy=",qxy
+			//		print "qz=",qz
+			
+			if(remhor) // this is to remove the horizon
+				if(qz<remhorqz)
+					chiq_image[ii][i]=0	
+				else
+					chiq_image[ii][i]=thisimage(qxy)(qz)
+				endif
+			else
+				chiq_image[ii][i]=thisimage(qxy)(qz)
+			endif
+			//print thisimage(qxy)(qz)
+
+		endfor
+	endfor
+	
+	// get a good wavename
+	string thisimagename = nameofwave(thisimage)
+	string shortimagename
+	string nameofthewave
+
+	SVAR memo = root:nori:chiq_memo
+	variable qz_pos = strsearch(thisimagename, "qzqxy",0)
+	string name_core = thisimagename[0, qz_pos -1]
+	string name_n_memo = name_core + memo
+	
+	
+	if(stringmatch(thisimagename,"*_qzqxy")==1)
+		shortimagename = RemoveEnding(thisimagename,"_qzqxy")
+		//print shortimagename
+		nameofthewave = name_n_memo + "_chiq"
+		
+	elseif(stringmatch(thisimagename,"*_qzqxy_s")==1)
+		shortimagename = removeending(thisimagename,"_qzqxy_s")
+		nameofthewave = name_n_memo + "_chiq_s"
+		
+	elseif(stringmatch(thisimagename, "*log")==1)
+		print "CAN'T PROCESS LOGSCALED FILE!!!"
+		return -1
+	
+	endif
+	
+	duplicate/O chiq_image $nameofthewave
+	killwaves chiwave, qwave, chiq_image
+	
+	
+end
+
+
+Function Integimage_nori(ba) : ButtonControl
+	STRUCT WMButtonAction &ba
+
+	switch( ba.eventCode )
+		case 2: // mouse up
+			// click code here
+			string thiswavename
+			Wave/T chiqs_list = root:nori:chiqs_wl
+			variable i
+			wave thewavelist_number = root:nori:chiqs_wl_n
+			for(i=0;i<numpnts(thewavelist_number);i+=1)
+				if(thewavelist_number[i]==1)
+					thiswavename = chiqs_list[i]
+					wave thiswave = $thiswavename
+					integrateimage_nori(thiswave)
+				endif
+			endfor
+			update_wavelist()
+			update_IvsQ_wavelist()
+			break
+		case -1: // control being killed
+			break
+	endswitch
+
+	return 0
+End
+
+
+function integrateimage_nori(thisimage) // function that creates an I vs Q wave from the image, by integrating over chi
+	wave thisimage
+
+	variable numrows = dimsize(thisimage,0)
+	variable numcolumns = dimsize(thisimage,1)
+	make /O /N=(numrows) sums
+	//sums= sum(thisimage, (q*numcolumns), (q*numcolumns-1)) // this only works for calculating the sum of columns
+	
+	
+	// write a (double...) loop to add all values in the rows
+	variable xvalue=0 // this and the next line used to probe a datavalue in the image
+	variable yvalue=0
+	variable sumsvalue=0 // this value is used to add up all the columns for one row, and put it into the resultant wave (sums)
+	variable n=0
+		For (n=0; n<numrows; n+=1)
+				for (yvalue=0; yvalue<numcolumns; yvalue+=1)
+				sumsvalue=sumsvalue+thisimage[n][yvalue]
+				endfor
+			sums[n]=sumsvalue
+			yvalue=0
+			sumsvalue=0
+		endfor
+	//setscale /I x, dimoffset(thisimage,0), (dimoffset(thisimage,0)+numpnts(sums)*dimdelta(thisimage,0)), sums
+	setscale /P x, dimoffset(thisimage,0), (dimdelta(thisimage,0)), sums
+	
+	// make a loop to remove all zeros
+		For (n=0;n<numrows;n+=1)
+			if(sums[n]==0)
+				sums[n]=NaN
+			endif
+		endfor
+	
+	// get a good wavename
+	string thisimagename = nameofwave(thisimage)
+
+	variable chiq_pos = strsearch(thisimagename, "_chiq", 0)
+	string name_core = thisimagename[0, chiq_pos -1]
+	
+	string sumsname
+	if(stringmatch(thisimagename, "chiq_s")==1)
+		sumsname = name_core + "_IvsQ_s"
+	
+	else
+		sumsname = name_core + "_IvsQ"
+	
+	endif
+	duplicate/O sums, $sumsname
+	Killwaves sums
+end
+
+
+Function ivschicalc_nori(ba) : ButtonControl
+	STRUCT WMButtonAction &ba
+
+	switch( ba.eventCode )
+		case 2: // mouse up
+			// click code here
+			string thiswavename
+			Wave/T chiq_wave_list = root:nori:chiqs_wl
+			//print wavenamelist
+			variable i
+			wave thewavelist_number = root:nori:chiqs_wl_n
+			for(i=0;i<numpnts(thewavelist_number);i+=1)
+				if(thewavelist_number[i]==1)
+					thiswavename = chiq_wave_list[i]
+					wave thiswave = $thiswavename
+					integrateimage2_nori(thiswave)
+				endif
+			endfor
+			update_wavelist()
+			update_IvsChi_wavelist()
+			break
+		case -1: // control being killed
+			break
+	endswitch
+
+	return 0
+End
+
+
+function integrateimage2_nori(thisimage) // function that creates an I vs chi wave from the image, by integrating over chi
+	wave thisimage
+//	variable sin_corr
+	
+	// do sin correction
+//	if(sin_corr) // only if this variable is 1, the sin corr will be performed
+//	thisimage= thisimage * sin(y)
+//	note thisimage "Sin correction is performed"
+//	endif
+	
+	// find the sum of each row
+	variable numrows = dimsize(thisimage,0)
+	variable numcolumns = dimsize(thisimage,1)
+	make /O /N=(numcolumns) sums
+	//sums= sum(thisimage, (q*numcolumns), (q*numcolumns-1)) // this only works for calculating the sum of columns
+	
+	
+	// write a (double...) loop to add all values in the rows
+	variable xvalue=0 // this and the next line used to probe a datavalue in the image
+	variable yvalue=0
+	variable sumsvalue=0 // this value is used to add up all the columns for one row, and put it into the resultant wave (sums)
+	variable n=0
+		For (n=0; n<numcolumns; n+=1)
+				for (yvalue=0; yvalue<numrows; yvalue+=1)
+				sumsvalue=sumsvalue+thisimage[yvalue][n]
+				endfor
+			sums[n]=sumsvalue
+			yvalue=0
+			sumsvalue=0
+		endfor
+	//setscale /I x, dimoffset(thisimage,0), (dimoffset(thisimage,0)+numpnts(sums)*dimdelta(thisimage,0)), sums
+	setscale /P x, dimoffset(thisimage,1), (dimdelta(thisimage,1)), sums
+	
+	// make a loop to remove all zeros
+		For (n=0;n<numcolumns;n+=1)
+			if(sums[n]==0)
+				sums[n]=NaN
+			endif
+		endfor
+	
+	// get a good wavename
+	string thisimagename = nameofwave(thisimage)
+	
+	
+	variable chiq_pos = strsearch(thisimagename, "_chiq", 0)
+	string name_core = thisimagename[0, chiq_pos -1]
+	
+	string sumsname
+	if(stringmatch(thisimagename, "chiq_s")==1)
+		sumsname = name_core + "_Ivschi_s"
+	
+	else
+		sumsname = name_core + "_Ivschi"
+	
+	endif
+	duplicate/O sums, $sumsname
+	Killwaves sums
+end
+
+
+Function setbkgnd_nori(ba) : ButtonControl // duplicates current image to the packages folder for future use
+	STRUCT WMButtonAction &ba
+
+	switch( ba.eventCode )
+		case 2: // mouse up
+			// click code here
+			string thiswavename
+			Wave/T qzqxy_wave_list = root:nori:qzqxy_wl
+			//string bkgndname = root:Packages:GIWAXS:g_bkgndstring
+			//print wavenamelist
+			variable i
+			//variable ii=0
+			wave thewavelist_number = root:nori:qzqxy_wl_n
+			for(i=0;i<numpnts(thewavelist_number);i+=1)
+				if(thewavelist_number[i]==1)
+				print i
+					thiswavename = qzqxy_wave_list[i]
+					wave thiswave = $thiswavename
+					duplicate/O thiswave root:Packages:GIWAXS:bkgndimage
+					string/G root:packages:GIWAXS:g_bkgndname = thiswavename
+					print "background image set: ", thiswavename
+				endif
+			endfor
+			break
+		case -1: // control being killed
+			break
+	endswitch
+
+	return 0
+End
+
+
+Function subtrbkgnd_nori(ba) : ButtonControl // subtracts the stored bkgnd in packages folder from selected data
+	STRUCT WMButtonAction &ba
+
+	switch( ba.eventCode )
+		case 2: // mouse up
+			// click code here
+			wave bkgndimage = root:Packages:GIWAXS:bkgndimage
+			svar bkgndname = root:Packages:GIWAXS:g_bkgndname
+			string thiswavename
+			Wave/T qzqxy_wave_list = root:nori:qzqxy_wl
+			//string bkgndname = root:Packages:GIWAXS:g_bkgndstring
+			//print wavenamelist
+			variable i
+			wave thewavelist_number = root:nori:qzqxy_wl_n
+			for(i=0;i<numpnts(thewavelist_number);i+=1)
+				if(thewavelist_number[i]==1)
+					thiswavename = qzqxy_wave_list[i]
+					wave thiswave = $thiswavename
+					string subtracted = thiswavename + "_s"
+					duplicate/O thiswave thiswavesubtr
+					thiswavesubtr = thiswave - bkgndimage
+					Note thiswavesubtr, "Background subtracted: "
+					Note/NOCR thiswavesubtr, bkgndname
+					rename thiswavesubtr $subtracted
+					
+					
+				endif
+			endfor
+			update_wavelist()
+			update_qzqxys_wavelist()
+			break
+		case -1: // control being killed
+			break
+	endswitch
+
+	return 0
+End
+
+
+Function Button_plotq_nori(ba) : ButtonControl
+	STRUCT WMButtonAction &ba
+
+	switch( ba.eventCode )
+		case 2: // mouse up
+			// click code here
+			string thiswavename
+			Wave/T qzqxy_wave_list = root:nori:qzqxy_wl
+			Wave/T qzqxys_wave_list = root:nori:qzqxy_wl
+			
+			Wave org_n = root:nori:qzqxy_wl_n
+			Wave sub_n =root:nori:qzqxys_wl_n
+			
+			//print wavenamelist
+			variable i
+			for(i=0;i<numpnts(org_n);i+=1)
+				if(org_n[i]==1)
+					thiswavename = qzqxy_wave_list[i]
+					Preferences 0;Display;AppendImage $thiswavename;DelayUpdate
+					execute "qzqxy_full();Preferences 1"
+					ModifyImage $thiswavename ctab= {0,200,Rainbow,1}
+					Execute "ModifyGraph width={Aspect,2}"
+					ModifyGraph height=288
+					set_quadrant()
+				endif
+			endfor
+
+			for(i=0;i<numpnts(sub_n);i+=1)
+				if(sub_n[i]==1)
+					thiswavename = qzqxys_wave_list[i]
+					Preferences 0;Display;AppendImage $thiswavename;DelayUpdate
+					execute "qzqxy_full();Preferences 1"
+					ModifyImage $thiswavename ctab= {0,200,Rainbow,1}
+					Execute "ModifyGraph width={Aspect,2}"
+					ModifyGraph height=288
+					set_quadrant()
+				endif
+			endfor
+			break
+		case -1: // control being killed
+			break
+			
+	endswitch
+
+	return 0
+End
+
+
+Function set_quadrant()
+
+	Execute "SetAxis left 0,2;DelayUpdate"
+	Execute "SetAxis bottom 0,2"
+	Execute "ModifyGraph width={Aspect,1}"
+			
+end
+
+
+Function logbutton_nori(ba) : ButtonControl
+	STRUCT WMButtonAction &ba
+
+	switch( ba.eventCode )
+		case 2: // mouse up
+			// click code here
+			string thiswavename
+			Wave/T qzqxy_wave_list = root:nori:qzqxy_wl
+			Wave/T qzqxys_wave_list = root:nori:qzqxys_wl
+			
+			Wave org_n = root:nori:qzqxy_wl_n
+			Wave sub_n = root:nori:qzqxys_wl_n
+			
+			//print wavenamelist
+			variable i
+			
+			for(i=0;i<numpnts(org_n);i+=1)
+				if(org_n[i]==1)
+					thiswavename = qzqxy_wave_list[i]
+					wave thiswave = $thiswavename
+					duplicate/O thiswave logwave
+					logwave=log(thiswave)
+					
+					string thisname = nameofwave(thiswave)
+					variable qz_pos = strsearch(thisname, "_qz", 0)
+					string name_core = thisname[0, qz_pos -1]
+					string logwavename = name_core + "_L_qzqxy"
+					duplicate/O logwave $logwavename
+				endif
+			endfor
+			
+			for(i=0;i<numpnts(sub_n);i+=1)
+				if(sub_n[i]==1)
+					thiswavename = qzqxys_wave_list[i]
+					wave thiswave = $thiswavename
+					duplicate/O thiswave logwave
+					logwave=log(thiswave)
+					
+					string thisname_s = nameofwave(thiswave)
+					variable qz_pos_s = strsearch(thisname_s, "_qz", 0)
+					string name_core_s = thisname_s[0, qz_pos_s - 1]
+					string logwavename_s = name_core_s + "_L_qzqxy_s"
+					duplicate/O logwave $logwavename_s
+				endif
+			endfor
+			
+			
+			killwaves logwave
+			update_wavelist()
+			update_qzqxy_wavelist()
+			update_qzqxys_wavelist()
+			break
+		case -1: // control being killed
+			break
+	endswitch
+
+	return 0
+End
+
+
+Function plot_chiq_nori(ba) : ButtonControl
+	STRUCT WMButtonAction &ba
+
+	switch( ba.eventCode )
+		case 2: // mouse up
+			// click code here
+			string thiswavename
+			Wave/T chiq_wave_list = root:nori:chiqs_wl
+			Wave chiq_n = root:nori:chiqs_wl_n
+			//print wavenamelist
+			variable i
+			
+			for(i=0;i<numpnts(chiq_n);i+=1)
+				if(chiq_n[i]==1)
+					thiswavename = chiq_wave_list[i]
+					Preferences 0;Display;AppendImage $thiswavename;DelayUpdate
+					Execute "chiq();Preferences 1"
+					ModifyImage $thiswavename ctab= {*,300,Rainbow,1}
+				endif
+			endfor
+			
+			break
+		case -1: // control being killed
+			break
+	endswitch
+
+	return 0
+End
